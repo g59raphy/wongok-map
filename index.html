@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>원곡고 맛집지도</title>
+<script>
+  // ▼▼▼ 카카오 개발자 사이트에서 받은 "JavaScript 키"를 따옴표 안에 붙여 넣으세요 ▼▼▼
+  const KAKAO_APP_KEY = "7b2ffcb6f4aba2b010900737fb21e6dd";
+  // ▲▲▲ 이 한 줄만 바꾸면 됩니다 ▲▲▲
+</script>
+<style>
+:root{
+  --bg:#f7f6f3; --panel:#ffffff; --text:#1d1d1f; --muted:#6b6b70; --line:#e6e4df;
+  --accent:#e4572e; --chip:#f0eee9; --shadow:0 2px 12px rgba(0,0,0,.12);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#141416; --panel:#1e1e21; --text:#ededee; --muted:#9a9aa0; --line:#2e2e33;
+         --accent:#ff7a52; --chip:#2a2a2e; --shadow:0 2px 12px rgba(0,0,0,.45); color-scheme:dark; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+#app{display:flex;height:100%}
+#side{width:380px;max-width:100%;display:flex;flex-direction:column;background:var(--panel);
+  border-right:1px solid var(--line);z-index:5}
+header{padding:18px max(18px, env(safe-area-inset-left)) 10px}
+h1{margin:0;font-size:20px;letter-spacing:-.3px}
+h1 span{color:var(--accent)}
+.sub{margin:4px 0 0;color:var(--muted);font-size:13px}
+.controls{padding:0 18px 12px;border-bottom:1px solid var(--line)}
+#q{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;
+  background:var(--bg);color:var(--text);outline:none}
+#q:focus{border-color:var(--accent)}
+.label{font-size:11px;color:var(--muted);margin:10px 0 6px;font-weight:600;letter-spacing:.3px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid transparent;background:var(--chip);color:var(--text);border-radius:999px;
+  padding:5px 10px;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:inherit}
+.chip .dot{width:8px;height:8px;border-radius:50%}
+.chip.on{background:var(--text);color:var(--panel)}
+.row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12.5px;color:var(--muted)}
+select{border:1px solid var(--line);background:var(--bg);color:var(--text);border-radius:8px;padding:4px 6px;font-size:12.5px}
+#list{flex:1;overflow:auto;padding:6px 10px 20px}
+.item{padding:12px 10px;border-radius:12px;cursor:pointer;display:flex;gap:10px;align-items:flex-start}
+.item:hover,.item.active{background:var(--chip)}
+.badge{flex:none;width:34px;height:34px;border-radius:50%;color:#fff;font-weight:700;font-size:13px;
+  display:flex;align-items:center;justify-content:center}
+.item h3{margin:0;font-size:15px}
+.meta{font-size:12px;color:var(--muted);margin-top:3px}
+.empty{color:var(--muted);text-align:center;padding:40px 0;font-size:14px}
+#mapwrap{flex:1;position:relative}
+#map{position:absolute;inset:0}
+#notice{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;
+  background:var(--bg);text-align:center;line-height:1.6;font-size:14px;color:var(--muted);z-index:2}
+#notice b{color:var(--text)}
+#notice[hidden]{display:none}
+/* 지도 마커 */
+.pin{border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);color:#fff;cursor:pointer;
+  font-weight:700;display:flex;align-items:center;justify-content:center;font-size:11px;transition:transform .12s}
+.pin:hover,.pin.sel{transform:scale(1.2)}
+/* 지도 위 정보 카드 */
+.card{position:relative;width:280px;max-width:80vw;background:var(--panel);color:var(--text);border-radius:14px;
+  box-shadow:var(--shadow);padding:14px 16px;margin-bottom:22px;font-size:13px;white-space:normal}
+.card:after{content:"";position:absolute;left:50%;bottom:-8px;margin-left:-8px;border:8px solid transparent;
+  border-bottom:0;border-top-color:var(--panel)}
+.card h3{margin:0 24px 2px 0;font-size:16px}
+.card .x{position:absolute;top:8px;right:10px;border:0;background:none;color:var(--muted);font-size:18px;cursor:pointer}
+.card ul{margin:8px 0 0;padding:0;list-style:none;max-height:170px;overflow:auto}
+.card li{line-height:1.45;padding:6px 0;border-top:1px dashed var(--line)}
+.card li b{color:var(--accent)}
+.links{display:flex;gap:6px;margin-top:10px}
+.links a{flex:1;text-align:center;font-size:12.5px;padding:7px 0;border-radius:8px;text-decoration:none;
+  background:var(--chip);color:var(--text);font-weight:600}
+.links a.kakao{background:#fee500;color:#191919}
+#toggle{display:none}
+@media (max-width:760px){
+  #app{flex-direction:column-reverse}
+  #side{width:100%;height:46%;border-right:0;border-top:1px solid var(--line);
+    border-radius:16px 16px 0 0;box-shadow:var(--shadow);transition:height .2s}
+  #side.min{height:150px}
+  #toggle{display:block;margin:8px auto 0;width:40px;height:5px;border-radius:3px;background:var(--line);border:0;cursor:pointer}
+  header{padding:8px 16px 6px}
+  .controls{padding:0 16px 10px}
+  .card{width:250px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <button id="toggle" aria-label="목록 접기/펼치기"></button>
+    <header>
+      <h1>원곡고 <span>맛집지도</span></h1>
+      <p class="sub">학생들이 직접 추천한 학교 주변 맛집 <b id="total"></b>곳</p>
+    </header>
+    <div class="controls">
+      <input id="q" type="search" placeholder="가게 이름, 메뉴, 추천 이유 검색">
+      <div class="label">분류</div>
+      <div class="chips" id="cats"></div>
+      <div class="label">추천한 반</div>
+      <div class="chips" id="classes"></div>
+      <div class="row">
+        <span id="count"></span>
+        <select id="sort">
+          <option value="count">추천 많은 순</option>
+          <option value="name">이름순</option>
+        </select>
+      </div>
+    </div>
+    <div id="list"></div>
+  </aside>
+  <div id="mapwrap">
+    <div id="map"></div>
+    <div id="notice" hidden></div>
+  </div>
+</div>
+<script>
+const DATA = [{"name": "한경길춘천닭갈비", "cat": "한식", "classes": ["1반", "2반", "4반", "5반", "6반"], "count": 5, "reasons": ["[1반] 닭갈비에 치즈+우동사리 추가 필수!", "[2반] 한경길춘천집닭갈비: 닭갈비에 우동사리+치즈 추가하는 것을 추천!!", "[4반] 춘천 닭갈비 / 닭갈비 / 맛있어서", "[5반] 닭갈비에 우동사리+치즈추가 필수!! 마무리는 역시 볶음밥으로...", "[6반] 닭갈비에 치즈+우동사리 추가하는 것을 추천!"], "addr": "경기도 안산시 단원구 선부광장로 27 (선부동)", "lat": 37.336159, "lng": 126.8104867}, {"name": "용추골미궁순대 본점", "cat": "한식", "classes": ["1반", "4반", "5반", "6반"], "count": 4, "reasons": ["[1반] 용추골, 순대국밥 및 돼지국밥 / 역대 먹은 국밥 중 제일 맛있을 정도로 맛있고 김치도 매우 맛있습니다", "[4반] 가게- 용추골순대 / 메뉴- 돼지국밥 / 맛있어요 완전 간도 잘 맞고 최공", "[5반] 용추골 순대국밥 / 추천메뉴:돼지국밥 / 이유:국물이 깔끔하고 나올때부터 간이 되어있어서 간을 맞출 필요가 없다 들깨까지 넣으면 고소한 맛까지 추가되어 환상에 맛을 느낄 수 있다 후식으로 바닐라 아이스크림도 있고 밀크커피에 넣어먹으면 맛있다", "[6반] 순대국밥이 맛있고 깔끔해요"], "addr": "경기도 안산시 단원구 선부광장1로 22 (선부동)", "lat": 37.3359237, "lng": 126.8077155}, {"name": "갈비이야기", "cat": "한식", "classes": ["4반", "5반"], "count": 2, "reasons": ["[4반] 갈비이야기 / 양념 이동갈비,양념 소갈비 추천👍🏻👍🏻 완전 맛있다 / 간이 잘되어 있고 양이 많다 / 외식 할때 자주 갔는데 4명이서 가면 30만원 정도 나온다는 단점이있다", "[5반] 갈비이야기-가족 외식할때마다 거의 대부분 여기서 밥을 먹는데 제일 맛있는건 양념돼지갈비가 진짜 맛있고 사람이 없는걸 본적이 없던 갈비집..매일 가득차있음"], "addr": "경기도 안산시 단원구 선부광장로 15 (선부동)", "lat": 37.3358485, "lng": 126.8085472}, {"name": "돌식당", "cat": "한식", "classes": ["5반"], "count": 2, "reasons": ["[5반] 추천메뉴는 감자탕 / 냄비 위로 푸짐하게 얹어져 나오는 고기와 재료 덕분에 대식가도 만족할 만한 양을 자랑합니다 마무리 볶음밥까지 이어지는 풀코스 조합이 기가 막힙니다", "[5반] 식당 이름: 돌식당 / 추천 메뉴: 감자탕+우거지 추가+다 먹고 볶음밥!!! / 이유: 양이 많고 직원분들도 친절하시다 마무리 볶음밥이 진짜 짱맛 +레트로 감성"], "addr": "경기도 안산시 단원구 선부광장1로 66 (선부동)", "lat": 37.3361065, "lng": 126.8116094}, {"name": "동양솥밥 안산본점", "cat": "한식", "classes": ["4반"], "count": 2, "reasons": ["[4반] 추천 메뉴: 꼬막 돌솥 - 꼬막을 비롯한 고명 양이 많기 때문이다.", "[4반] <식당 이름> 동양솥밥 / <추천 메뉴> 묵은지삼겹살솥밥 / <추천 이유> 중앙동에 있는 음식점 중에 양도 많고 젤 맛있는 것 같다"], "addr": "경기도 안산시 단원구 고잔2길 (고잔동)", "lat": 37.3180918, "lng": 126.836381}, {"name": "육쌈냉면", "cat": "한식", "classes": ["4반", "5반"], "count": 2, "reasons": ["[4반] 육쌈냉면 / 물냉면 / 맛도 좋고 고기까지 나와서 가성비라서", "[5반] 육쌈냉면-물냉면 / 숯불고기랑 물냉면 같이 주는데 11,000! 양이 많고 맛있어요"], "addr": "경기도 안산시 단원구 중앙대로 (고잔동)", "lat": 37.3172184, "lng": 126.8374669}, {"name": "김치콩나물삼겹살 (선부2동)", "cat": "한식", "classes": ["2반"], "count": 1, "reasons": ["[2반] 김치 콩나물 삼겹살: 삼겹살 맛있어요"], "addr": "경기도 안산시 단원구 지곡로 27-1 (선부동)", "lat": 37.3372542, "lng": 126.8039929}, {"name": "김콩삼 (김치콩나물삼겹살)", "cat": "한식", "classes": ["6반"], "count": 1, "reasons": ["[6반] 김콩삼(김치콩나물삼겹살) / 가족과 함께 식사하기에 좋아요!"], "addr": "경기도 안산시 단원구 선부광장1로 173 (원곡동)", "lat": 37.3313313, "lng": 126.8053689}, {"name": "냉면쟁이고기꾼 선부점", "cat": "한식", "classes": ["5반"], "count": 1, "reasons": ["[5반] 냉면쟁이고기꾼 & 비빔밥 선부점 / 양도 매우 많고 죽기전에 먹어야한다는 녹차냉면으로 만들어서 매우 쫄깃합니다. 추천메뉴는 연탄불고기 냉면세트에서 열무냉면으로 바꿔서 써먹어야 합니다. 다른 사이드는 거기서 거기입니다"], "addr": "경기도 안산시 단원구 선부광장남로 (선부동)", "lat": 37.3292544, "lng": 126.8132461}, {"name": "단원왕족발", "cat": "한식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 안산 족발 1등"], "addr": "경기도 안산시 단원구 라성로 (원곡동)", "lat": 37.32846, "lng": 126.8016851}, {"name": "담꾹 안산원곡점", "cat": "한식", "classes": ["6반"], "count": 1, "reasons": ["[6반] 안동찜닭, 즉석치즈떡볶이, 차돌버석된장찌개 / 이 세 개의 음식을 추전합니다."], "addr": "경기도 안산시 단원구 화랑로 (원곡동)", "lat": 37.3260564, "lng": 126.8022409}, {"name": "대탐소실 안산점", "cat": "한식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 마늘양념갈비 필수 고기 퀄리티 짱 셀프바에서 또띠아 구워서 갈릭소스 빌라서 고기랑 쌈 싸먹기 필수"], "addr": "경기도 안산시 단원구 광덕대로 146 (고잔동)", "lat": 37.3094376, "lng": 126.8306746}, {"name": "돼지대첩 안산백운점", "cat": "한식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 경기도 안산시 단원구 화랑로 102 돼지대첩 안산 백운점 / 목살 소고기"], "addr": "경기도 안산시 단원구 라성로 (원곡동)", "lat": 37.3262798, "lng": 126.8000534}, {"name": "뒷고집", "cat": "한식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 추천 식당: 뒷고집 - 돼지 부속 전문점인데 잡내 없고 맛있다."], "addr": "경기도 안산시 단원구 라성로 (원곡동)", "lat": 37.3262799, "lng": 126.8000589}, {"name": "따뜻한밥상", "cat": "한식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 따뜻한 밥상 8900원 제육정식 꼭드세요 / 양도 많고 사장님이 가끔 과일 서비스도 주십니다"], "addr": "경기도 안산시 단원구 예술대학로 17 (고잔동)", "lat": 37.3185883, "lng": 126.8364913}, {"name": "버섯칼국수 (고잔1동)", "cat": "한식", "classes": ["2반"], "count": 1, "reasons": ["[2반] 경기도 안산 단원구 고잔1동 버섯칼국수집: 매운탕과 감자전을 추천드립니다. 먹는 법 매운탕의 버섯과 고기 건더기를 다먹고난뒤 면을너어 칼국수로 먹고 마지막에 밥까지 볶음밥으로 만들어 먹는다"], "addr": "경기도 안산시 단원구 적금로 (고잔동)", "lat": 37.318729, "lng": 126.8263524}, {"name": "삼겹애김치 초지점", "cat": "한식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 삼겹살 추천 / 고기와 김치가 잘어울려서 맛있음"], "addr": "경기도 안산시 단원구 화랑로 159 (원곡동)", "lat": 37.3239708, "lng": 126.8062011}, {"name": "샤브올데이", "cat": "한식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 샤브올데이 / 무한리필 샤브샤브 후식 망고 케이크가 진리입니다"], "addr": "경기도 안산시 단원구 선부광장1로 6 (선부동)", "lat": 37.3347697, "lng": 126.8070465}, {"name": "서대문김치찜", "cat": "한식", "classes": ["6반"], "count": 1, "reasons": ["[6반] 서대문김치찜 / 김치찜에 고기가 많고 맛있어요!"], "addr": "경기도 안산시 단원구 선부광장로 71 (선부동)", "lat": 37.3328879, "lng": 126.8110467}, {"name": "신창면옥", "cat": "한식", "classes": ["4반"], "count": 1, "reasons": ["[4반] <신창면옥> / 회냉면-면이 간이 잘 되어있으며 회도 적당히 올라가있음"], "addr": "경기도 안산시 단원구 선부광장1로 (선부동)", "lat": 37.3336176, "lng": 126.8068971}, {"name": "양평해장국 (원곡동)", "cat": "한식", "classes": ["5반"], "count": 1, "reasons": ["[5반] 양평해장국 / 추천메뉴:매운갈비찜 / 이유:갈비찜 하나로 밥세공기 가능 맛있어용"], "addr": "경기도 안산시 단원구 화랑로 (원곡동)", "lat": 37.3272, "lng": 126.8010262}, {"name": "엉클짱왕해물찜탕", "cat": "한식", "classes": ["5반"], "count": 1, "reasons": ["[5반] 엉클짱왕탕찜 / 해물찜,아구찜,계란찜 / 콩나물 짱 많고 소스 짱맛"], "addr": "경기도 안산시 단원구 선부광장1로 38 (선부동)", "lat": 37.3365975, "lng": 126.8093841}, {"name": "옛날경성순대국 안산직영점", "cat": "한식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 옛날경성순대국 안산직영점 / 순대국 / 고잔신도시에 있는 순대국집인데 국물이 깔끔하면서도 진하고 고기와 순대가 푸짐하게 들어가서 든든하게 먹기 좋은 곳이다. 매장도 깔끔하고 부담 없이 한 끼 먹기 좋다."], "addr": "경기도 안산시 단원구 광덕대로 206 (고잔동)", "lat": 37.3147188, "lng": 126.8312054}, {"name": "운봉골남원추어탕", "cat": "한식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 추어탕 추천 국물이 퍽퍽하고 반찬이 맛있어서"], "addr": "경기도 안산시 단원구 동산로 (초지동)", "lat": 37.3247036, "lng": 126.8103948}, {"name": "원곡2동 냉면집", "cat": "한식", "classes": ["2반"], "count": 1, "reasons": ["[2반] 물냉면"], "addr": "경기도 안산시 단원구 원초로 (원곡동)", "lat": 37.3277633, "lng": 126.8018224}, {"name": "원조게장정식", "cat": "한식", "classes": ["2반"], "count": 1, "reasons": ["[2반] 식당 이름- 원조게장정식 / 추천 메뉴-게장 / 추천 이유- 싸고 맛있고 가까워서"], "addr": "경기도 안산시 단원구 부부로3길 23 (원곡동)", "lat": 37.3325323, "lng": 126.7938551}, {"name": "장군부대찌개 선부점", "cat": "한식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 추천 메뉴: 장군부대찌개 / 가격: 12,000원 / 선부동 부대찌개 GOAT!!"], "addr": "경기도 안산시 단원구 동산로 (선부동)", "lat": 37.3326195, "lng": 126.8104771}, {"name": "최가네춘천닭갈비", "cat": "한식", "classes": ["5반"], "count": 1, "reasons": ["[5반] \"최가네춘천닭갈비\"입니다. / 가족이랑 같이 먹으러 갔더니 너무 맛있었습니다."], "addr": "경기도 안산시 단원구 신길로 13-5 (원곡동)", "lat": 37.3318012, "lng": 126.7867717}, {"name": "하나교회 잔치국수", "cat": "한식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 하나교회, 잔치국수, 메뉴가 비록 하나여도 리필이 2번이상 가능해서 좋고 예수님을 볼 수 있어요"], "addr": "경기도 안산시 단원구 화정로 5 (선부동)", "lat": 37.3325994, "lng": 126.8136687}, {"name": "한방전주콩나물국밥", "cat": "한식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 한방전주콩나물국밥, 콩나물국밥 및 해장국 / 맛이랑 가성비도 좋고 24시간 운영해 언제든 갈 수 있습니다"], "addr": "경기도 안산시 단원구 선부로 167 (선부동)", "lat": 37.3419158, "lng": 126.8136744}, {"name": "할머니감자탕", "cat": "한식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 할머니감자탕, 감자탕 / 라이벌 감자탕집 엄마 감자탕을 이기고 살아남은 레전드 감자탕집"], "addr": "경기도 안산시 단원구 선부광장1로 66 (선부동)", "lat": 37.3359347, "lng": 126.8115184}, {"name": "해마을 감자탕", "cat": "한식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 맛있음"], "addr": "경기도 안산시 단원구 라성안길 17 (원곡동)", "lat": 37.327739, "lng": 126.8023447}, {"name": "해미청", "cat": "한식", "classes": ["5반"], "count": 1, "reasons": ["[5반] 저희 집 단골 아구찜 가게입니다. 자리가 많아 단체로 가도 충분하고, 새우튀김과 볶음밥이 맛있어요."], "addr": "경기도 안산시 단원구 선부광장로 (선부동)", "lat": 37.33303, "lng": 126.8114055}, {"name": "훈장골", "cat": "한식", "classes": ["4반"], "count": 1, "reasons": ["[4반] <훈장골> / 추천메뉴-함흥 물냉면: 간이 잘 되어 있고, 국물이 시원하다. / 한방양념한돈구이: 고기가 부드럽고, 양념이 잘 되어있다."], "addr": "경기도 안산시 단원구 신길로 13-19 (원곡동)", "lat": 37.3329396, "lng": 126.7875979}, {"name": "오뚜기도삭면", "cat": "중식·아시아", "classes": ["1반", "2반", "4반", "5반", "6반"], "count": 3, "reasons": ["[1반] 오뚜기도삭면: 라조기, 토마토달걀볶음 추천!!", "[1반] 식당 이름: 오뚜기 도삭면 / 추천 메뉴: 홍소우육면 / 추천 이유: 면이 맛있고 가격도 저렴해서 추천합니다", "[6반] 라조기가 맛있어요!"], "addr": "경기도 안산시 단원구 원곡로 3 (원곡동)", "lat": 37.3306761, "lng": 126.7952803}, {"name": "찐하오마라탕앤우육면", "cat": "중식·아시아", "classes": ["1반", "2반", "4반"], "count": 3, "reasons": ["[1반] 마라탕, 마라샹궈 맛있어요 꿔바로우도 필수", "[2반] 찐하오 마라탕 / 추천메뉴 마라탕 / 맛있어요", "[4반] 찐하오 / 마라탕 / 맛있어요"], "addr": "경기도 안산시 단원구 원선1로 (선부동)", "lat": 37.325441, "lng": 126.8013077}, {"name": "보광짬뽕", "cat": "중식·아시아", "classes": ["4반", "6반"], "count": 2, "reasons": ["[4반] 짬뽕이 맛잇고 국물도 맛잇다 해물도 많다", "[6반] 간짜장 내공이 상당합니다"], "addr": "경기도 안산시 단원구 화랑로 (원곡동)", "lat": 37.3262177, "lng": 126.800593}, {"name": "연길양꼬치", "cat": "중식·아시아", "classes": ["2반", "5반"], "count": 2, "reasons": ["[2반] 연길양꼬치 / 추천 메뉴: 양꼬치 / 추천 이유: 저는 이곳에 자주 방문했는데 음식이 정말 맛있어요.", "[5반] 식당이름은 연길양꼬치이고 추천메뉴는 양꼬치와 냉면이다 왜냐하면 양꼬치의 크기가 다른 양꼬치 집 보다 크기가 더 크고 냉면은 면이 쫄깃해서 이 두가지 메뉴를 추천한다"], "addr": "경기도 안산시 단원구 원본로1길 10-1 (원곡동)", "lat": 37.3316764, "lng": 126.7924975}, {"name": "풍광쟈창차이 (신길로)", "cat": "중식·아시아", "classes": ["1반", "4반"], "count": 2, "reasons": ["[1반] 라조기, 지삼선 추천!!", "[4반] 풍광쟈창차이 / 추천메뉴: 지삼선, 라조기, 마라탕"], "addr": "경기도 안산시 단원구 신길로 9-3 (원곡동)", "lat": 37.3310904, "lng": 126.7861423}, {"name": "강뚝 양꼬치", "cat": "중식·아시아", "classes": ["2반"], "count": 1, "reasons": ["[2반] 강뚝 양꼬치 / 추천하는 메뉴:옛날맛 양꼬치 / 추천 이유:작년에 알바했는데맛있어서 추천합니다"], "addr": "경기도 안산시 단원구 원곡로 22-1 (원곡동)", "lat": 37.3292289, "lng": 126.7922912}, {"name": "교동짬뽕", "cat": "중식·아시아", "classes": ["6반"], "count": 1, "reasons": ["[6반] 이 맛집은 원곡2동에 있으며  푸르지오 브리파크 e편한세상센트럴포레 아파트 사이에 있으며 짬뽕 짜장면 모두 시켜서 먹을 수 있습니다"], "addr": "경기도 안산시 단원구 라성로 (원곡동)", "lat": 37.3274567, "lng": 126.8003442}, {"name": "네팔리 번사거르 (인도·네팔 음식)", "cat": "중식·아시아", "classes": ["1반"], "count": 1, "reasons": ["[1반] 커리 맛있음"], "addr": "경기도 안산시 단원구 부부로 28-1 (원곡동)", "lat": 37.3310891, "lng": 126.7899181}, {"name": "라화쿵부", "cat": "중식·아시아", "classes": ["4반"], "count": 1, "reasons": ["[4반] 라화쿵부 존맛 마라탕집 1위 말이 필요 없더 청경체 옥수수 소고기 떡 곤약 청경체는 필수 단무지와 싸서 땅콩소스"], "addr": "경기도 안산시 단원구 다문화길 23 (원곡동)", "lat": 37.3301289, "lng": 126.7906491}, {"name": "마마교자관", "cat": "중식·아시아", "classes": ["5반"], "count": 1, "reasons": ["[5반] 마마교자관 / 추천메뉴: 쯔란소고기 / 추천이유: 다문화 거리에 처음가서 먹어본 음식인데 짭조롬한 맛과 향신료와 소고기의 조합이 잘 어울려 너무 맛있었다!!1 이 음식 뿐 아니라 다양한 음식이 많이 팔았는데 다른 음식도 너무 맛있었다!! 또간집에 나왓대여 다들 꼭 한 번 가보시길~!"], "addr": "경기도 안산시 단원구 원곡로 34 (원곡동)", "lat": 37.330024, "lng": 126.7929041}, {"name": "반저반점", "cat": "중식·아시아", "classes": ["4반"], "count": 1, "reasons": ["[4반] 식당명: 반저반점 / 추천 메뉴: 꽈배기, 유육단 / 추천 이유: 반찬 종류도 많고 중국 반찬 먹고 싶으면 가볼만한 곳이고 자주 가면 서비스로 반찬 자주 주셔서 좋아요."], "addr": "경기도 안산시 단원구 원본로 22 (원곡동)", "lat": 37.3306433, "lng": 126.7921291}, {"name": "샤오춘마라탕", "cat": "중식·아시아", "classes": ["5반"], "count": 1, "reasons": ["[5반] 마라탕과 꿔바로우가 맛있고 서비스로 아이스크림과 음료수가 있음 (내가 가본 마라탕 가게 중에서 가장 깨끗)"], "addr": "경기도 안산시 단원구 예술대학로 17 (고잔동)", "lat": 37.318662, "lng": 126.8365131}, {"name": "선부마라탕", "cat": "중식·아시아", "classes": ["6반"], "count": 1, "reasons": ["[6반] 선부마라탕"], "addr": "경기도 안산시 단원구 선부광장1로 88 (선부동)", "lat": 37.3348546, "lng": 126.8127195}, {"name": "동북대식당", "cat": "중식·아시아", "classes": ["2반"], "count": 1, "reasons": ["[2반] 다양한 중국 볶음, 마라두부, 양꼬치튀김, 감자쇠고기간장볶음"], "addr": "경기도 안산시 단원구 원본로3길 10-1 (원곡동)", "lat": 37.331344, "lng": 126.7941738}, {"name": "탕화쿵푸 마라탕", "cat": "중식·아시아", "classes": ["6반"], "count": 1, "reasons": ["[6반] 탕화공부 마라탕"], "addr": "경기도 안산시 단원구 원본로3길 17 (원곡동)", "lat": 37.3315751, "lng": 126.7944632}, {"name": "팔도반점 본점", "cat": "중식·아시아", "classes": ["1반"], "count": 1, "reasons": ["[1반] 경기도 안산시 단원구 고잔동 540 팔도반점 본점 / 간짜장,크림짬뽕 간짜장이 꾸덕하고 춘장맛이 진하고 맛있어요!! 크림짬뽕은...맛은 있는데 두번은...좀 느끼해요..."], "addr": "경기도 안산시 단원구 고잔2길 (고잔동)", "lat": 37.317401, "lng": 126.8400199}, {"name": "풍광쟈창차이 2호점 (고잔동)", "cat": "중식·아시아", "classes": ["2반"], "count": 1, "reasons": ["[2반] 토마토달걀볶음맛잇고 꿔바로우가 진짜 바삭하고 마파두부랑 볶음밥이 ㄹㅈㄷ 맛잇어요"], "addr": "경기도 안산시 단원구 예술대학로 17 (고잔동)", "lat": 37.3185883, "lng": 126.8364913}, {"name": "한짬뽕 신길점", "cat": "중식·아시아", "classes": ["4반"], "count": 1, "reasons": ["[4반] 한짬뽕 최고의 짬뽕 맛집"], "addr": "경기도 안산시 단원구 신길중앙로 5 (신길동)", "lat": 37.3364633, "lng": 126.7603584}, {"name": "긴자료코 선부점", "cat": "일식", "classes": ["1반", "4반"], "count": 2, "reasons": ["[1반] 긴자료코, 베이컨크림우동 및 데미그라스돈까스 / 양도 푸짐하고 느끼한 거 잘먹는 사람에게 추천", "[4반] 긴자료코 / 추천메뉴:사케동 / 이유:연어가 안비리고 맛있어서"], "addr": "경기도 안산시 단원구 선부광장1로 (선부동)", "lat": 37.3369913, "lng": 126.8122679}, {"name": "유미카츠 선부2호점", "cat": "일식", "classes": ["1반", "4반"], "count": 2, "reasons": ["[1반] 사장님이 이쁘시고 착하고 돈까스 맛있어요", "[4반] 카레카츠 맛도리인데 브레이크 타임 없는게 크랙"], "addr": "경기도 안산시 단원구 선부광장로 (선부동)", "lat": 37.3328477, "lng": 126.8110377}, {"name": "긴자료코 안산고잔점", "cat": "일식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 치킨 카레 우동에 고로케까지 먹어보세요"], "addr": "경기도 안산시 단원구 광덕서로 56 (고잔동)", "lat": 37.3096754, "lng": 126.8273615}, {"name": "당당초밥", "cat": "일식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 초밥 시키면 반찬으로 참기름 바른 묵은지가 나오는데 아주 맜잌ㅅ어요 가격도 저렴함"], "addr": "경기도 안산시 단원구 산단로 325 (원곡동)", "lat": 37.3238886, "lng": 126.7857855}, {"name": "돈돈정 안산점", "cat": "일식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 규카츠랑 스키야키 맛있어요"], "addr": "경기도 안산시 단원구 고잔2길 45 (고잔동)", "lat": 37.3178788, "lng": 126.8360893}, {"name": "만고쿠 안산점", "cat": "일식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 만고쿠 : 규동 덮밥규동 덮밥 진짜 댕맛잇어용.."], "addr": "경기도 안산시 단원구 고잔2길 45 (고잔동)", "lat": 37.3178788, "lng": 126.8360893}, {"name": "멘츠루 안산중앙점", "cat": "일식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 규동 맛있음 추천"], "addr": "경기도 안산시 단원구 고잔로 102 (고잔동)", "lat": 37.3187138, "lng": 126.8376187}, {"name": "백소정 선부점", "cat": "일식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 마제소바 레전드 맛집"], "addr": "경기도 안산시 단원구 달미로 (선부동)", "lat": 37.3367724, "lng": 126.8121704}, {"name": "석석석", "cat": "일식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 석석석 돈카츠 드세요"], "addr": "경기도 안산시 단원구 고잔2길 (고잔동)", "lat": 37.3174835, "lng": 126.8358682}, {"name": "스시초진", "cat": "일식", "classes": ["2반"], "count": 1, "reasons": ["[2반] 안먹으면인생손해"], "addr": "경기도 안산시 단원구 화랑로 159 (원곡동)", "lat": 37.3233342, "lng": 126.8062141}, {"name": "춘참치", "cat": "일식", "classes": ["6반"], "count": 1, "reasons": ["[6반] 맛있는 참치"], "addr": "경기도 안산시 단원구 선부광장로 27 (선부동)", "lat": 37.3363888, "lng": 126.8102966}, {"name": "카츠오모이", "cat": "일식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 카츠오모이 : 안심⭐️⭐️"], "addr": "경기도 안산시 단원구 고잔로 72 (고잔동)", "lat": 37.3189578, "lng": 126.834253}, {"name": "쿠우쿠우 골드 안산점", "cat": "일식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 초밥이 맛있어요"], "addr": "경기도 안산시 단원구 고잔로 72 (고잔동)", "lat": 37.3189499, "lng": 126.8338061}, {"name": "해가초밥", "cat": "일식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 학교 학생의 부모님께서 운영하시는 초밥 맛집입니다."], "addr": "경기도 안산시 단원구 라성로 (원곡동)", "lat": 37.3264332, "lng": 126.7994142}, {"name": "휘니치로", "cat": "일식", "classes": ["5반"], "count": 1, "reasons": ["[5반] 아카이라멘을 드셔야 돼요 라멘에 들어가는 계란장이 진짜 킥이고요 전 계란이 너무 맛있어서 또 먹으러 갔을 때 추가안되냐고 했는데 그냥 주셔서 좋았고요 다른 라멘도 다 맛있긴 합니다 근대 윗층은 추천 안 하겠습니다 키가 작은 친구도 머리를 계속 박아서 힘들어햇습니다"], "addr": "경기도 안산시 단원구 고잔1길 69 (고잔동)", "lat": 37.3182387, "lng": 126.8414159}, {"name": "투파인드피터 고잔점", "cat": "양식", "classes": ["4반", "5반"], "count": 2, "reasons": ["[4반] < 투파인드피터 > / 추천메뉴: 전복내장리조또, 빠네크림파스타", "[5반] 전복내장리조또 추천!! 빠네파스타도 맛있음!!"], "addr": "경기도 안산시 단원구 광덕2로 163-5 (고잔동)", "lat": 37.3104576, "lng": 126.8284223}, {"name": "그 남자의 이태리 식당", "cat": "양식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 그 남자의 이태리 식당 / 양고기: 고기 별로 인좋아하는데 부드러워서 맛있었음"], "addr": "경기도 안산시 단원구 고잔1길 (고잔동)", "lat": 37.3180362, "lng": 126.8377292}, {"name": "도스마스 예대점", "cat": "양식", "classes": ["4반"], "count": 1, "reasons": ["[4반] <도스마스>-닭고기부리또 밥대신 감자넣고,치츠추가-모짜렐라-싸고 양 많아요"], "addr": "경기도 안산시 단원구 예술대학로5길 3 (와동)", "lat": 37.3312337, "lng": 126.8385937}, {"name": "롤링파스타 안산중앙점", "cat": "양식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 롤링파스타 / 추천메뉴:치즈듬뿍 오븐파스타 / 이유:치즈가 많은데 가성비로 먹을 수 있다"], "addr": "경기도 안산시 단원구 예술대학로 17 (고잔동)", "lat": 37.3185883, "lng": 126.8364913}, {"name": "부부로8길 피자집", "cat": "양식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 여기 피자 만원쯤인데 싸고 맛있음 양도 많아서 한번쯤은 가는걸 추천"], "addr": "경기도 안산시 단원구 부부로8길 17 (원곡동)", "lat": 37.3393654, "lng": 126.79461}, {"name": "어스트밀", "cat": "양식", "classes": ["5반"], "count": 1, "reasons": ["[5반] 어스트밀 / 어스트밀 브런치 플레이트 / 분위기도 이쁘고 맛도 괜찮아요"], "addr": "경기도 안산시 단원구 고잔2길 45 (고잔동)", "lat": 37.3179326, "lng": 126.8361191}, {"name": "카사 데 타코", "cat": "양식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 이름: 카사 데 타코 / 추천 메뉴: 포크브리또, 양이 많고 가게 분위기도 좋음"], "addr": "경기도 안산시 단원구 광덕대로 155 (고잔동)", "lat": 37.3104992, "lng": 126.8290699}, {"name": "파스타입니다", "cat": "양식", "classes": ["2반"], "count": 1, "reasons": ["[2반] 파스타입니다 / 매콤크림파스타 / 적당히 매콤해서 맛있다 포장 전문점"], "addr": "경기도 안산시 단원구 관산4길 12 (원곡동)", "lat": 37.3302569, "lng": 126.7983471}, {"name": "피제리아 라쪼", "cat": "양식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 이름: 피제리아 라쪼 / 추천 메뉴: 마르게리따 리코타 피자, 블루리본 맛집, 화덕피자라 다 맛있음"], "addr": "경기도 안산시 단원구 광덕1로 165 (고잔동)", "lat": 37.3083142, "lng": 126.828257}, {"name": "토마토김밥", "cat": "분식", "classes": ["1반", "2반"], "count": 2, "reasons": ["[1반] 이게 위치가 안 꽃히긴 하는데 요쪽 라인에 토마토김밥이라고 집이있는데 여기 참치 주먹밥이 3500원정도인데 겁나 맛있음 믹스 주먹밥도 겁나 맛있음", "[2반] (토마토김밥) 참치 김밥을 맛있게 싸주십니다 👍👍👍"], "addr": "경기도 안산시 단원구 라성로 (원곡동)", "lat": 37.3281183, "lng": 126.8008625}, {"name": "동대문엽기떡볶이 (고잔동)", "cat": "분식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 프렌차이즈 떡볶이 지점중에 제일 맵고 맛있음"], "addr": "경기도 안산시 단원구 보화로 24 (와동)", "lat": 37.3310596, "lng": 126.8296099}, {"name": "동대문엽기떡볶이 (원곡동)", "cat": "분식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 엽기떡볶이, 로제떡볶이 / 맛있어요"], "addr": "경기도 안산시 단원구 화랑로 (원곡동)", "lat": 37.3257109, "lng": 126.8022445}, {"name": "명인만두 고잔1호점", "cat": "분식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 명인만두 군만두 바삭하고 맛있어요"], "addr": "경기도 안산시 단원구 광덕대로 130 (고잔동)", "lat": 37.3080747, "lng": 126.8306431}, {"name": "보성프라자 분식", "cat": "분식", "classes": ["1반"], "count": 1, "reasons": ["[1반] 떡볶이 튀김 순대 다 맛잇어여"], "addr": "경기도 안산시 단원구 라성로 (원곡동)", "lat": 37.3286163, "lng": 126.8016323}, {"name": "삼촌김밥", "cat": "분식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 경기도 안산시 단원구 원초로 경남아너스빌상가 삼촌김밥 / 추천메뉴: 쫄면, 치즈돈가스, 순두부찌개, 덮밥 / 추천이유: 평소 자주 가는 곳으로 음식이 맛있고 매장도 깨끗해 가격도 부담스럽지 않아 편하게 방문하기 좋기 때문에 추천했다."], "addr": "경기도 안산시 단원구 원초로 (원곡동)", "lat": 37.3287188, "lng": 126.8020649}, {"name": "신전떡볶이 안산선부점", "cat": "분식", "classes": ["5반"], "count": 1, "reasons": ["[5반] 신전떡볶이 안산점 / 제가 추천하는 메뉴는 떡볶이입니다. 떡볶이는 매콤하고 달콤해서 맛있고 떡볶이 소스와 잘 어울립니다. 특히 김밥을 떡볶이와 같이 먹으면 더 맛있어서 이 메뉴들을 추천합니다."], "addr": "경기도 안산시 단원구 석수로 (선부동)", "lat": 37.3369065, "lng": 126.8080979}, {"name": "얌샘김밥 신길점", "cat": "분식", "classes": ["4반"], "count": 1, "reasons": ["[4반] 얌샘김밥 / 추천메뉴: 오므라이스 / 추천이유: 오므라이스 안에 볶음밥이 계란이랑 더블로 맛있음"], "addr": "경기도 안산시 단원구 신각길 (신길동)", "lat": 37.3374245, "lng": 126.7747057}, {"name": "튀김천하", "cat": "분식", "classes": ["5반"], "count": 1, "reasons": ["[5반] 튀김천하 / 추천메뉴:겨울에 파는 붕어빵 / 이유:싸구려 슈크림이 아니고 맛도리 슈크림에다가 팥,크림 양도 푸짐히 넣어주고 빠삭빠삭해서 더 맛난다"], "addr": "경기도 안산시 단원구 원초로 (원곡동)", "lat": 37.3283596, "lng": 126.801763}, {"name": "맥도날드 안산선부점", "cat": "패스트푸드·치킨", "classes": ["2반"], "count": 2, "reasons": ["[2반] 추천 메뉴: 맥도날드 1955 세트", "[2반] 맥도날드 / 빅맥 세트로 부탁드립니다 감튀가 먹어줍니다"], "addr": "경기도 안산시 단원구 삼일로 (원곡동)", "lat": 37.3343016, "lng": 126.8068853}, {"name": "미오또닭강정", "cat": "패스트푸드·치킨", "classes": ["1반", "6반"], "count": 2, "reasons": ["[1반] 닭강정 원툴!!", "[6반] 닭강정 기본 맛이 가장 맛있습니당"], "addr": "경기도 안산시 단원구 원초로 (원곡동)", "lat": 37.3283596, "lng": 126.801763}, {"name": "버거킹 안산선부역점", "cat": "패스트푸드·치킨", "classes": ["1반", "2반"], "count": 2, "reasons": ["[1반] 통새우 와퍼에 새우 3마리 추가 무조건임 / 버거킹앱 쓰면 매번 할인쿠폰 쓸 수 있어요.", "[2반] 버거킹 / 갈릭불고기와퍼세트 / 아삭아삭 맛있습니다"], "addr": "경기도 안산시 단원구 정지로 23 (선부동)", "lat": 37.3361884, "lng": 126.8095598}, {"name": "BHC치킨 안산원곡점", "cat": "패스트푸드·치킨", "classes": ["2반"], "count": 1, "reasons": ["[2반] 뿌링클!"], "addr": "경기도 안산시 단원구 원선로 61-5 (원곡동)", "lat": 37.3302794, "lng": 126.7987845}, {"name": "KFC 안산선부점", "cat": "패스트푸드·치킨", "classes": ["2반"], "count": 1, "reasons": ["[2반] KFC 안산선부점: 징거버거를 추천! 기본적인 치킨, 마요네즈, 빵, 채소 등이 잘 어울린다."], "addr": "경기도 안산시 단원구 화정천서로 (선부동)", "lat": 37.3393491, "lng": 126.815809}, {"name": "동명닭집 안산본점", "cat": "패스트푸드·치킨", "classes": ["6반"], "count": 1, "reasons": ["[6반] 동명닭집 안산본점 / 이유 닭고기가좋아서"], "addr": "경기도 안산시 단원구 선부광장1로 70 (선부동)", "lat": 37.3358383, "lng": 126.8116374}, {"name": "롯데리아 안산선부점", "cat": "패스트푸드·치킨", "classes": ["1반"], "count": 1, "reasons": ["[1반] 모짜렐라 인더버거 맛있어요"], "addr": "경기도 안산시 단원구 달미로 (선부동)", "lat": 37.3403585, "lng": 126.8146266}, {"name": "롯데리아 안산제일점", "cat": "패스트푸드·치킨", "classes": ["2반"], "count": 1, "reasons": ["[2반] 경기도 안산시 단원구 선부광장1로 롯데리아 안산제일점 / 추천메뉴 : 모짜렐라인더버거 라지세트 / 치즈가 쭉쭉 늘어나고 정말 맛있습니당!!🤩🤩"], "addr": "경기도 안산시 단원구 선부광장1로 56 (선부동)", "lat": 37.3365386, "lng": 126.8109356}, {"name": "파파이스 안산중앙점", "cat": "패스트푸드·치킨", "classes": ["4반"], "count": 1, "reasons": ["[4반] 치킨이 엄청 바삭바삭하고 에그타르트도 맛있음"], "addr": "경기도 안산시 단원구 고잔2길 (고잔동)", "lat": 37.3185976, "lng": 126.8357437}, {"name": "파파존스 안산선부점", "cat": "패스트푸드·치킨", "classes": ["2반"], "count": 1, "reasons": ["[2반] 슈퍼파파스 추천해요 / 더블초코칩브라우니 혈당오르는 맛이에요"], "addr": "경기도 안산시 단원구 원선로 (원곡동)", "lat": 37.3331312, "lng": 126.8062706}, {"name": "마리나 베이커리", "cat": "카페·디저트", "classes": ["4반", "5반"], "count": 2, "reasons": ["[4반] <마리나베이커리> / 추천 메뉴: 꿀케이크- 꿀의 달콤한 맛과 부드러운 크림이 잘 어울려서 맛있다", "[5반] 다양한 케이크를 먹을수있고, 케이크가 달아서 맛있어요"], "addr": "경기도 안산시 단원구 부부로8길 19 (원곡동)", "lat": 37.3393503, "lng": 126.7948844}, {"name": "관산4길 꽈배기집", "cat": "카페·디저트", "classes": ["1반"], "count": 1, "reasons": ["[1반] 꽈배기 맛있어요"], "addr": "경기도 안산시 단원구 관산4길 6 (원곡동)", "lat": 37.3300801, "lng": 126.7978461}, {"name": "귀큰여우", "cat": "카페·디저트", "classes": ["5반"], "count": 1, "reasons": ["[5반] 귀큰여우-안에 인테리어도 귀엽고 디저트가 맛있음 특히 파르페가 인기메뉴인데 난 말차라떼랑 허니브레드 추천"], "addr": "경기도 안산시 단원구 중앙대로 (고잔동)", "lat": 37.3172357, "lng": 126.8374796}, {"name": "까까아이스 원곡점", "cat": "카페·디저트", "classes": ["1반", "2반"], "count": 1, "reasons": ["[1반] 아이스크림 맛있어요"], "addr": "경기도 안산시 단원구 원초로 (원곡동)", "lat": 37.3299865, "lng": 126.8014488}, {"name": "떡하루", "cat": "카페·디저트", "classes": ["4반"], "count": 1, "reasons": ["[4반] 떡하루 과일모찌파는 곳 딸기 모찌랑 귤모찌 제일 맛잇음 추천"], "addr": "경기도 안산시 단원구 고잔로 64 (고잔동)", "lat": 37.3190679, "lng": 126.8329677}, {"name": "소랑제과", "cat": "카페·디저트", "classes": ["4반"], "count": 1, "reasons": ["[4반] 소랑제과 - 초코 소금빵 추천 / 굉장히 맛있음 그리고 휘낭시에도 추천"], "addr": "경기도 안산시 단원구 삼일로 (원곡동)", "lat": 37.3345647, "lng": 126.8039718}, {"name": "스마일찹쌀꽈배기", "cat": "카페·디저트", "classes": ["1반"], "count": 1, "reasons": ["[1반] 스마일찹쌀꽈배기 치즈볼,꽈배기,도너츠,핫도그 치즈볼이 진짜 맛있어요!"], "addr": "경기도 안산시 상록구 석호로 276-1 (본오동)", "lat": 37.2933774, "lng": 126.8612206}, {"name": "스코니코니", "cat": "카페·디저트", "classes": ["4반"], "count": 1, "reasons": ["[4반] 경기도 안산시 단원구 라성도 브리파크상가 스코니코니 / 초코쿠키스콘이랑 에그타르트 완존마싯어요"], "addr": "경기도 안산시 단원구 라성로 (원곡동)", "lat": 37.3263561, "lng": 126.7993127}, {"name": "시크릿브레드", "cat": "카페·디저트", "classes": ["1반"], "count": 1, "reasons": ["[1반] 크림 소금빵 맛잇어여"], "addr": "경기도 안산시 단원구 원초로 (원곡동)", "lat": 37.3299865, "lng": 126.8014488}, {"name": "와플칸 라성점", "cat": "카페·디저트", "classes": ["1반"], "count": 1, "reasons": ["[1반] 와플칸 라성점 / 콘치즈 맛있어요 / 단 것도 있지만, 치즈에다가 옥수수 얹은 고소한 와플 맛있어요."], "addr": "경기도 안산시 단원구 라성로 (원곡동)", "lat": 37.327172, "lng": 126.800048}, {"name": "이공커피 백운동", "cat": "카페·디저트", "classes": ["2반"], "count": 1, "reasons": ["[2반] 이공커피 초코버블티 펄 2번 추가"], "addr": "경기도 안산시 단원구 라성로 (원곡동)", "lat": 37.3284193, "lng": 126.80111}, {"name": "카페 나드오프", "cat": "카페·디저트", "classes": ["5반"], "count": 1, "reasons": ["[5반] 추천 메뉴:레몬 파운드 / 이유:가격은 좀 비싸지만 정말 맛있어서 한번쯤 먹어볼 만함.(젤라또도 맛있음)"], "addr": "경기도 안산시 단원구 화랑로 (원곡동)", "lat": 37.3252605, "lng": 126.8027455}, {"name": "카페인중독 안산선부역점", "cat": "카페·디저트", "classes": ["2반"], "count": 1, "reasons": ["[2반] 카페인중독 / 돼지바 와플 추천합니당 / 생크림이 진짜 맛잇어요"], "addr": "경기도 안산시 단원구 선부광장1로 38 (선부동)", "lat": 37.3366404, "lng": 126.8093892}, {"name": "GS25 안산원곡점", "cat": "기타", "classes": ["4반"], "count": 1, "reasons": ["[4반] 편밥하세요"], "addr": "경기도 안산시 단원구 원곡로 51 (원곡동)", "lat": 37.331671, "lng": 126.79355}, {"name": "메가박스 안산중앙", "cat": "기타", "classes": ["4반"], "count": 1, "reasons": ["[4반] 리클라이너 의자에서 즐기는 달콤한 카라멜 팝콘이 압권"], "addr": "경기도 안산시 단원구 고잔2길 41 (고잔동)", "lat": 37.3179405, "lng": 126.8356398}, {"name": "짱피시", "cat": "기타", "classes": ["6반"], "count": 1, "reasons": ["[6반] 짱피시 음식 맛있어요!"], "addr": "경기도 안산시 단원구 선부광장1로 84 (선부동)", "lat": 37.335236, "lng": 126.8125759}, {"name": "카페동이 시화나래점", "cat": "기타", "classes": ["1반"], "count": 1, "reasons": ["[1반] 쭈꾸미 굳."], "addr": "경기도 안산시 단원구 대부황금로 1927 (대부동)", "lat": 37.3127983, "lng": 126.6095429}];
+const COLORS = {
+  "한식":"#e4572e","중식·아시아":"#c0392b","일식":"#2e86de","양식":"#8e44ad",
+  "분식":"#f39c12","패스트푸드·치킨":"#d35400","카페·디저트":"#16a085","기타":"#7f8c8d"
+};
+const color = c => COLORS[c] || "#555";
+const esc = s => String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+
+// 같은 좌표에 여러 가게가 있으면 살짝 펼쳐서 겹치지 않게
+const groups = {};
+DATA.forEach((d,i) => { d.id = i; d.plat = d.lat; d.plng = d.lng; const k = d.lat+","+d.lng; (groups[k] ||= []).push(d); });
+Object.values(groups).forEach(g => { if (g.length < 2) return;
+  g.forEach((d,j) => { const a = 2*Math.PI*j/g.length; d.plat = d.lat + 0.00012*Math.sin(a); d.plng = d.lng + 0.00015*Math.cos(a); }); });
+
+// ---------- 목록 / 필터 (지도와 상관없이 항상 동작) ----------
+const state = { q:"", cats:new Set(), classes:new Set(), sort:"count" };
+const cats = [...new Set(DATA.map(d => d.cat))].sort((a,b) => Object.keys(COLORS).indexOf(a) - Object.keys(COLORS).indexOf(b));
+const classes = [...new Set(DATA.flatMap(d => d.classes))].sort((a,b) => parseInt(a)-parseInt(b));
+
+function chips(el, items, set, dot){
+  el.innerHTML = `<button class="chip on" data-v="">전체</button>` +
+    items.map(v => `<button class="chip" data-v="${esc(v)}">${dot?`<span class="dot" style="background:${color(v)}"></span>`:""}${esc(v)}</button>`).join("");
+  el.addEventListener("click", e => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    const v = b.dataset.v;
+    if (!v) set.clear(); else set.has(v) ? set.delete(v) : set.add(v);
+    el.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c.dataset.v ? set.has(c.dataset.v) : set.size === 0));
+    render(true);
+  });
+}
+chips(document.getElementById("cats"), cats, state.cats, true);
+chips(document.getElementById("classes"), classes, state.classes, false);
+document.getElementById("total").textContent = DATA.length;
+document.getElementById("q").addEventListener("input", e => { state.q = e.target.value.trim().toLowerCase(); render(true); });
+document.getElementById("sort").addEventListener("change", e => { state.sort = e.target.value; render(false); });
+document.getElementById("toggle").addEventListener("click", () => document.getElementById("side").classList.toggle("min"));
+
+function filtered(){
+  return DATA.filter(d =>
+    (!state.cats.size || state.cats.has(d.cat)) &&
+    (!state.classes.size || d.classes.some(c => state.classes.has(c))) &&
+    (!state.q || (d.name+" "+d.addr+" "+d.reasons.join(" ")).toLowerCase().includes(state.q))
+  ).sort((a,b) => state.sort === "name" ? a.name.localeCompare(b.name,"ko") : b.count - a.count || a.name.localeCompare(b.name,"ko"));
+}
+
+function render(fit){
+  const list = filtered();
+  document.getElementById("count").textContent = `${list.length}곳 표시 중`;
+  document.getElementById("list").innerHTML = list.length ? list.map(d => `
+    <div class="item" data-id="${d.id}">
+      <div class="badge" style="background:${color(d.cat)}">${d.count}</div>
+      <div><h3>${esc(d.name)}</h3>
+      <div class="meta">${esc(d.cat)} · ${esc(d.classes.join(", "))}</div>
+      <div class="meta">${esc(d.addr.replace(/^경기도 안산시 단원구 /,""))}</div></div>
+    </div>`).join("") : `<div class="empty">조건에 맞는 맛집이 없어요</div>`;
+  if (MAP.ready) MAP.show(list, fit);
+}
+document.getElementById("list").addEventListener("click", e => {
+  const it = e.target.closest(".item"); if (!it) return;
+  const d = DATA[+it.dataset.id];
+  highlight(d.id);
+  if (MAP.ready) MAP.focus(d);
+});
+function highlight(id){
+  document.querySelectorAll(".item").forEach(i => i.classList.toggle("active", +i.dataset.id === id));
+  const el = document.querySelector(`.item[data-id="${id}"]`);
+  if (el) el.scrollIntoView({ block:"nearest", behavior:"smooth" });
+}
+
+function cardHtml(d){
+  const reasons = d.reasons.map(r => esc(r).replace(/^\[(\d+반)\]/, "<b>$1</b>")).map(r => `<li>${r}</li>`).join("");
+  const n = encodeURIComponent(d.name);
+  return `<div class="card"><button class="x" aria-label="닫기">×</button><h3>${esc(d.name)}</h3>
+    <div class="meta">${esc(d.cat)} · 추천 ${d.count}회 (${esc(d.classes.join(", "))})<br>${esc(d.addr)}</div>
+    <ul>${reasons}</ul>
+    <div class="links">
+      <a class="kakao" target="_blank" rel="noopener" href="https://map.kakao.com/link/to/${n},${d.lat},${d.lng}">카카오 길찾기</a>
+      <a target="_blank" rel="noopener" href="https://map.kakao.com/link/search/${n}">가게 정보</a>
+    </div></div>`;
+}
+
+// ---------- 카카오 지도 ----------
+const MAP = { ready:false };
+function showNotice(html){ const n = document.getElementById("notice"); n.innerHTML = html; n.hidden = false; }
+
+function initKakao(){
+  const K = kakao.maps;
+  const map = new K.Map(document.getElementById("map"), { center: new K.LatLng(37.3330, 126.8060), level: 5 });
+  map.addControl(new K.ZoomControl(), K.ControlPosition.RIGHT);
+  const pins = {}, card = new K.CustomOverlay({ clickable:true, yAnchor:1, zIndex:10 });
+  let sel = null;
+
+  DATA.forEach(d => {
+    const size = 22 + Math.min(d.count,5)*4;
+    const el = document.createElement("div");
+    el.className = "pin";
+    el.style.cssText = `width:${size}px;height:${size}px;background:${color(d.cat)}`;
+    el.textContent = d.count > 1 ? d.count : "";
+    el.title = d.name;
+    el.addEventListener("click", () => { open(d); highlight(d.id); });
+    pins[d.id] = { el, ov: new K.CustomOverlay({ position:new K.LatLng(d.plat,d.plng), content:el, clickable:true, zIndex:d.count }) };
+  });
+
+  function open(d){
+    const wrap = document.createElement("div");
+    wrap.innerHTML = cardHtml(d);
+    wrap.querySelector(".x").addEventListener("click", close);
+    card.setContent(wrap.firstElementChild);
+    card.setPosition(new K.LatLng(d.plat, d.plng));
+    card.setMap(map);
+    if (sel) sel.classList.remove("sel");
+    sel = pins[d.id].el; sel.classList.add("sel");
+  }
+  function close(){ card.setMap(null); if (sel) sel.classList.remove("sel"); sel = null; }
+  K.event.addListener(map, "click", close);
+
+  MAP.focus = d => { map.setLevel(3); map.panTo(new K.LatLng(d.plat, d.plng)); open(d); };
+  MAP.show = (list, fit) => {
+    const ids = new Set(list.map(d => d.id));
+    DATA.forEach(d => pins[d.id].ov.setMap(ids.has(d.id) ? map : null));
+    close();
+    if (!fit || !list.length) return;
+    // 멀리 떨어진 1~2곳 때문에 지도가 너무 축소되지 않도록 중앙값 근처 위주로 맞춤
+    const med = a => { const s=[...a].sort((x,y)=>x-y); return s[Math.floor(s.length/2)]; };
+    const cl = med(list.map(d=>d.lat)), cg = med(list.map(d=>d.lng));
+    const near = list.filter(d => Math.abs(d.lat-cl) < 0.03 && Math.abs(d.lng-cg) < 0.04);
+    const b = new K.LatLngBounds();
+    (near.length ? near : list).forEach(d => b.extend(new K.LatLng(d.lat, d.lng)));
+    if (near.length === 1 || list.length === 1) { map.setCenter(b.getCenter()); map.setLevel(3); }
+    else map.setBounds(b, 40, 40, 40, 40);
+  };
+  MAP.ready = true;
+  render(true);
+}
+
+render(false);
+if (!KAKAO_APP_KEY || KAKAO_APP_KEY.startsWith("여기에")) {
+  showNotice(`<div><b>카카오 지도 키가 아직 없어요.</b><br>index.html 위쪽의 <b>KAKAO_APP_KEY</b>에<br>카카오 JavaScript 키를 넣으면 지도가 나타나요.<br>왼쪽 목록과 검색은 지금도 쓸 수 있어요.</div>`);
+} else {
+  const s = document.createElement("script");
+  s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(KAKAO_APP_KEY)}&autoload=false`;
+  s.onload = () => {
+    if (window.kakao && kakao.maps) kakao.maps.load(initKakao);
+    else s.onerror();
+  };
+  s.onerror = () => showNotice(`<div><b>카카오 지도를 불러오지 못했어요.</b><br>① JavaScript 키가 맞는지<br>② 카카오 앱 설정 › 플랫폼 › Web 에<br><b>${esc(location.origin)}</b> 주소가 등록됐는지<br>③ 카카오맵 사용 설정이 켜져 있는지 확인해 주세요.</div>`);
+  document.head.appendChild(s);
+}
+</script>
+</body>
+</html>
